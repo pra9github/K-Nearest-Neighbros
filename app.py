@@ -1,45 +1,54 @@
-from flask import Flask, render_template, request
-from dotenv import load_dotenv
 import os
-import groq
+import json
+from flask import Flask, render_template, request, redirect, url_for
+from groq import Groq  # Make sure to `pip install groq`
 
-# Load environment variables from .env
-load_dotenv()
+from modules.analyzer import analyze_code, complete_code, refactor_code
 
-# Initialize Flask app
 app = Flask(__name__)
 
-# Initialize Groq client with API key
-client = groq.Groq(api_key=os.getenv("GROQ_API_KEY"))
+# Groq client setup
+groq_client = Groq(api_key="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")  # replace with your actual Groq API key
 
-# Function to send code to Groq LLM and get review
-def get_code_review(code):
-    prompt = f"""You are a code review assistant. Analyze the following code and identify:
-1. Security vulnerabilities
-2. Performance issues
-3. Code quality improvements
-Return your feedback in bullet points.
+HISTORY_FILE = "review_history.json"
 
-Code:
-{code}
-"""
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",  # Updated model
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2
-    )
-    return response.choices[0].message.content
+# Load review history from file
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, "r") as f:
+            return json.load(f)
+    return []
 
-# Main route
+# Save review history to file
+def save_history(history):
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(history, f, indent=2)
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     review = ""
     if request.method == "POST":
-        code = request.form.get("code")
-        if code:
-            review = get_code_review(code)
+        code = request.form["code"]
+
+        # Analyze, complete, and refactor the code
+        analysis = analyze_code(code, groq_client)
+        completion = complete_code(code, groq_client)
+        refactor = refactor_code(code, groq_client)
+
+        # Combine all reviews
+        review = f"🔍 Analysis:\n{analysis}\n\n✨ Suggestions:\n{refactor}\n\n⚙️ Completion:\n{completion}"
+
+        # Save review history
+        history = load_history()
+        history.append({"code": code, "review": review})
+        save_history(history)
+
     return render_template("index.html", review=review)
 
-# Run the app
+@app.route("/dashboard")
+def dashboard():
+    history = load_history()
+    return render_template("dashboard.html", history=history)
+
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Code Review Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container">
+    <h2>📊 Code Review History Dashboard</h2>
+
+    <!-- Chart showing trends -->
+    <canvas id="trendChart" height="100"></canvas>
+
+    <h3>📝 Past Reviews</h3>
+    <div class="history">
+        {% for item in history %}
+            <div class="review-card">
+                <pre><strong>Code:</strong>
+        {{ item.code[:300] }}...</pre>
+                <pre><strong>Review:</strong>
+        {{ item.review[:300] }}...</pre>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Embedding JSON data safely -->
+<script id="reviewData" type="application/json">
+    {{ history | tojson | safe }}
+</script>
+
+<script>
+    const reviewHistory = JSON.parse(document.getElementById('reviewData').textContent);
+
+    const labels = reviewHistory.map((_, i) => `Review ${i + 1}`);
+    const reviewLengths = reviewHistory.map(r => r.review.length);
+
+    new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Review Length Over Time',
+                data: reviewLengths,
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top' },
+                title: {
+                    display: true,
+                    text: 'Review Trends'
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>
