@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Code Review Assistant (Groq)</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>💡 AI-Powered Code Review Assistant</h2>
+        <form method="POST">
+            <textarea name="code" placeholder="Paste your code here..." required>{{ request.form.code or '' }}</textarea><br>
+            <button type="submit">Get Code Review</button>
+        </form>
+
+        {% if review %}
+        <h3>🔍 Review:</h3>
+        <pre>{{ review }}</pre>
+        {% endif %}
+        
+        <br>
+        <a href="{{ url_for('dashboard') }}" class="btn">📊 View Dashboard</a>
+    </div>
+</body>
+</html>
