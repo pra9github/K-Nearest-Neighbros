@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelligent Code Assistant</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/theme/dracula.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/addon/hint/show-hint.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #4f46e5;
+            --bg-color: #111827;
+            --text-color: #f3f4f6;
+            --panel-color: #1f2937;
+            --accent-color: #8b5cf6;
+            --error-color: #ef4444;
+            --warning-color: #f59e0b;
+            --success-color: #10b981;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        
+        header {
+            text-align: center;
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 2rem;
+            color: var(--primary-color);
+        }
+        
+        .editor-container {
+            display: flex;
+            gap: 1rem;
+            height: 80vh;
+        }
+        
+        .code-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--panel-color);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+        
+        .panel-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+        
+        .panel-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        .button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .button.secondary {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .button.secondary:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .editor-wrapper {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .CodeMirror {
+            height: 100%;
+            font-size: 14px;
+        }
+        
+        .suggestions-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--panel-color);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .panel-content {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .completion-item, .suggestion-item {
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-left: 3px solid var(--accent-color);
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .completion-item:hover, .suggestion-item:hover {
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+        
+        .suggestion-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--accent-color);
+        }
+        
+        .suggestion-description {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+        
+        .suggestion-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .suggestion-complexity {
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+        
+        .suggestion-complexity.simple {
+            color: #10b981;
+        }
+        
+        .suggestion-complexity.medium {
+            color: #f59e0b;
+        }
+        
+        .suggestion-complexity.complex {
+            color: #ef4444;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        
+        .tab.active {
+            opacity: 1;
+            border-bottom: 2px solid var(--primary-color);
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .status-bar {
+            padding: 0.5rem 1rem;
+            background-color: rgba(0, 0, 0, 0.3);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+        }
+        
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        /* Inline Suggestions & Error Highlighting */
+        .CodeMirror-line .inline-suggestion {
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            text-decoration-color: var(--primary-color);
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .CodeMirror-line .syntax-error {
+            text-decoration: wavy underline;
+            text-decoration-color: var(--error-color);
+        }
+        
+        .CodeMirror-line .warning {
+            text-decoration: wavy underline;
+            text-decoration-color: var(--warning-color);
+        }
+        
+        .quick-fix-popup {
+            position: absolute;
+            background-color: var(--panel-color);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            padding: 0.5rem;
+            min-width: 200px;
+            max-width: 300px;
+            font-size: 12px;
+        }
+        
+        .quick-fix-title {
+            font-weight: 600;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 0.5rem;
+        }
+        
+        .quick-fix-option {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 0.25rem;
+        }
+        
+        .quick-fix-option:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Real-time feedback marker styling */
+        .CodeMirror-line .error-marker {
+            background-color: rgba(239, 68, 68, 0.2);
+        }
+        
+        .CodeMirror-line .warning-marker {
+            background-color: rgba(245, 158, 11, 0.1);
+        }
+        
+        .CodeMirror-line .info-marker {
+            background-color: rgba(99, 102, 241, 0.1);
+        }
+        
+        /* Auto-complete overlay styling */
+        .CodeMirror-hints {
+            position: absolute;
+            z-index: 10;
+            overflow: hidden;
+            list-style: none;
+            margin: 0;
+            padding: 0.25rem;
+            border-radius: 0.375rem;
+            background-color: var(--panel-color);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            max-height: 20em;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .CodeMirror-hint {
+            margin: 0;
+            padding: 0.5rem;
+            white-space: pre;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            border-radius: 0.25rem;
+        }
+        
+        .CodeMirror-hint:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .CodeMirror-hint-active {
+            background-color: rgba(99, 102, 241, 0.2);
+        }
+        
+        .hint-type {
+            margin-left: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--accent-color);
+            opacity: 0.8;
+        }
+        
+        /* Real-time feedback indicator */
+        .real-time-indicator {
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--success-color);
+            z-index: 10;
+        }
+        
+        .real-time-indicator.processing {
+            background-color: var(--warning-color);
+        }
+        
+        .real-time-indicator.error {
+            background-color: var(--error-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Intelligent Code Assistant</h1>
+        </header>
+        
+        <div class="editor-container">
+            <div class="code-panel">
+                <div class="panel-header">
+                    <div class="panel-title">Python Code Editor</div>
+                    <div class="panel-buttons">
+                        <button id="analyze-btn" class="button">Analyze Code</button>
+                        <button id="refactor-btn" class="button secondary">Apply Refactoring</button>
+                        <button id="toggle-realtime-btn" class="button secondary">Real-time Assistant: ON</button>
+                    </div>
+                </div>
+                <div class="editor-wrapper">
+                    <div class="real-time-indicator"></div>
+                    <textarea id="code-editor"></textarea>
+                    <div id="quick-fix-popup" class="quick-fix-popup" style="display: none;"></div>
+                </div>
+                <div class="status-bar">
+                    <div id="cursor-position">Line: 1, Col: 1</div>
+                    <div id="analysis-status">Ready</div>
+                </div>
+            </div>
+            
+            <div class="suggestions-panel">
+                <div class="panel-header">
+                    <div class="panel-title">Intelligent Suggestions</div>
+                </div>
+                <div class="tabs">
+                    <div class="tab active" data-tab="completions">Code Completions</div>
+                    <div class="tab" data-tab="refactoring">Refactoring Suggestions</div>
+                    <div class="tab" data-tab="realtime-feedback">Real-time Feedback</div>
+                </div>
+                <div id="completions" class="tab-content active">
+                    <div class="panel-content" id="completions-list">
+                        <div class="empty-state">
+                            Write some code and analyze to get completions
+                        </div>
+                    </div>
+                </div>
+                <div id="refactoring" class="tab-content">
+                    <div class="panel-content" id="refactoring-list">
+                        <div class="empty-state">
+                            Write some code and analyze to get refactoring suggestions
+                        </div>
+                    </div>
+                </div>
+                <div id="realtime-feedback" class="tab-content">
+                    <div class="panel-content" id="realtime-list">
+                        <div class="empty-state">
+                            Real-time feedback will appear here as you type
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/addon/hint/show-hint.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/addon/hint/anyword-hint.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/addon/mark/mark.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.63.1/addon/lint/lint.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.2/socket.io.min.js"></script>
+    <script>
+        // Initialize CodeMirror
+        const codeEditor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+            mode: 'python',
+            theme: 'dracula',
+            lineNumbers: true,
+            indentUnit: 4,
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            lineWrapping: true,
+            extraKeys: {
+                "Ctrl-Space": "autocomplete"
+            }
+        });
+        
+        // Sample initial code
+        codeEditor.setValue(`import math
+import time
+import os
+import sys
+
+def calculate_area(radius):
+    """Calculate the area of a circle."""
+    return math.pi * radius * radius
+
+def calculate_volume(radius, height):
+    """Calculate the volume of a cylinder."""
+    return calculate_area(radius) * height
+
+# Example usage
+for r in range(1, 5):
+    area = calculate_area(r)
+    print(f"Circle with radius {r} has area: {area:.2f}")
+
+for r in range(1, 5):
+    for h in range(1, 5):
+        volume = calculate_volume(r, h)
+        print(f"Cylinder with radius {r} and height {h} has volume: {volume:.2f}")
+`);
+
+        // SocketIO connection
+        const socket = io();
+        let socketConnected = false;
+        let realtimeEnabled = true;
+        let typingTimer;
+        const doneTypingInterval = 500; // Time in ms (half a second)
+        let currentMarkers = [];
+        
+        // Connect to Socket.IO
+        socket.on('connect', () => {
+            socketConnected = true;
+            document.querySelector('.real-time-indicator').style.backgroundColor = 'var(--success-color)';
+            console.log('Connected to real-time assistant');
+        });
+        
+        socket.on('disconnect', () => {
+            socketConnected = false;
+            document.querySelector('.real-time-indicator').style.backgroundColor = 'var(--error-color)';
+            console.log('Disconnected from real-time assistant');
+        });
+        
+        // Set up real-time code change monitoring
+        codeEditor.on('change', (cm, change) => {
+            if (!realtimeEnabled || !socketConnected) return;
+            
+            // Clear previous timer
+            clearTimeout(typingTimer);
+            
+            // Show processing indicator
+            document.querySelector('.real-time-indicator').style.backgroundColor = 'var(--warning-color)';
+            
+            // Set a new timer to wait for typing to finish
+            typingTimer = setTimeout(() => {
+                const code = cm.getValue();
+                const cursor = cm.getCursor();
+                const currentLine = cm.getLine(cursor.line);
+                
+                // Send code to server for real-time analysis
+                socket.emit('code_change', {
+                    code: code,
+                    cursor_pos: cursor.ch,
+                    current_line: currentLine
+                });
+            }, doneTypingInterval);
+        });
+        
+        // Handle real-time feedback from server
+        socket.on('real_time_feedback', (data) => {
+            // Update the UI to show we're not processing anymore
+            document.querySelector('.real-time-indicator').style.backgroundColor = 'var(--success-color)';
+            
+            // Clear previous markers
+            clearCodeMarkers();
+            
+            // Handle syntax errors
+            if (!data.success && data.syntax_error) {
+                if (data.line) {
+                    highlightLine(data.line - 1, 'error-marker');
+                    displayRealTimeFeedback(data.issues);
+                }
+            } else {
+                // Handle suggestions
+                if (data.issues && data.issues.length > 0) {
+                    displayRealTimeFeedback(data.issues);
+                    markIssuesInCode(data.issues);
+                }
+                
+                // Handle completions in real-time
+                if (data.completions && data.completions.length > 0) {
+                    displayCompletions(data.completions);
+                }
+            }
+        });
+        
+        // Handle quick fix results
+        socket.on('quick_fix_result', (data) => {
+            if (data.success) {
+                codeEditor.setValue(data.fixed_code);
+                document.getElementById('analysis-status').textContent = 'Quick fix applied';
+            } else {
+                document.getElementById('analysis-status').textContent = 'Quick fix failed: ' + data.message;
+            }
+            hideQuickFixPopup();
+        });
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.getAttribute('data-tab');
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show active content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
